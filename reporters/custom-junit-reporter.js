@@ -59,10 +59,8 @@ class CustomJunitReporter {
           const fullMsg = assertion.failureMessages.join("\n");
           const lines = fullMsg.split("\n");
 
-          // Check if this is a jest-expect-message formatted error
           let messageForAttribute = lines[0];
           if (lines[0] === "Error: Custom message:" && lines.length > 1) {
-            // Extract the actual custom message from the second line (trim whitespace)
             messageForAttribute = lines[1].trim();
           }
 

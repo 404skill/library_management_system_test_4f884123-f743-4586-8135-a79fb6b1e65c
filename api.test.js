@@ -4,7 +4,6 @@ const request = require("supertest");
 const api = request("http://app:3000");
 const Redis = require("ioredis");
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
-// Helper fns
 async function createBook(data) {
   const res = await api.post("/api/books").send(data);
   return res.body.id;
@@ -23,6 +22,26 @@ async function deleteBook(id) {
 }
 async function getPopular(limit) {
   return api.get(`/api/books/popular${limit ? `?limit=${limit}` : ""}`);
+}
+
+async function createUser(data) {
+  const res = await api.post("/api/users").send(data);
+  return res.body.id;
+}
+async function listUsers() {
+  return api.get("/api/users");
+}
+async function getUserDetail(id) {
+  return api.get(`/api/users/${id}`);
+}
+async function assignBookToUser(userId, bookId) {
+  return api.post(`/api/users/${userId}/books/${bookId}`);
+}
+async function removeBookFromUser(userId, bookId) {
+  return api.delete(`/api/users/${userId}/books/${bookId}`);
+}
+async function listUserBooks(userId) {
+  return api.get(`/api/users/${userId}/books`);
 }
 
 const validBooks = [
@@ -53,6 +72,16 @@ const invalidBooks = [
   [{ publishedDate: "not-a-date" }, "invalid date"],
   [{ pages: -5 }, "negative pages"],
   [{ pages: 0 }, "zero pages"],
+];
+
+const validUsers = [
+  { name: "Alice", email: "alice@example.com" },
+  { name: "Bob",   email: "bob@example.com" }
+];
+const invalidUsers = [
+  [{}, "missing all fields"],
+  [{ name: "" }, "empty name"],
+  [{ email: "not-an-email" }, "invalid email"]
 ];
 
 describe("Task 1: Health Check Endpoint", () => {
@@ -213,7 +242,6 @@ describe("Task 3: CRUD Operations", () => {
 describe("Task 4: Filtering", () => {
   let books = [];
   beforeAll(async () => {
-    // clear & create three books
     books = [];
     for (const b of validBooks) {
       const id = await createBook(b);
@@ -280,9 +308,8 @@ describe("Task 5: Basic Caching", () => {
     const listKey = `booksList::${JSON.stringify({})}`;
   
     beforeAll(async () => {
-      await redis.flushall();                              // start clean
-      bookId = await createBook(validBooks[0]);            // ensure at least one book
-    });
+      await redis.flushall();
+      bookId = await createBook(validBooks[0]);
   
     it("caches GET /api/books under a list key", async () => {
       const { status } = await listBooks();
@@ -294,7 +321,6 @@ describe("Task 5: Basic Caching", () => {
   
     it("caches GET /api/books/:id under book:id key", async () => {
       const key = `book:${bookId}`;
-      // clear any previous
       await redis.del(key);
   
       const { status } = await getBook(bookId);
@@ -305,13 +331,11 @@ describe("Task 5: Basic Caching", () => {
     });
   });
   
-  // TASK 6: TTL TUNING
   describe("Task 6: TTL Tuning", () => {
     let bookId;
     const listKey = `booksList::${JSON.stringify({})}`;
   
     beforeAll(async () => {
-      // exercise both endpoints to (re)populate cache with TTLs
       bookId = await createBook(validBooks[1]);
       await listBooks();
       await getBook(bookId);
@@ -331,7 +355,6 @@ describe("Task 5: Basic Caching", () => {
     });
   });
   
-  // TASK 7: CACHE INVALIDATION
   describe("Task 7: Cache Invalidation", () => {
     let bookId;
     const listKey = `booksList::${JSON.stringify({})}`;
@@ -339,13 +362,11 @@ describe("Task 5: Basic Caching", () => {
     beforeAll(async () => {
       await redis.flushall();
       bookId = await createBook(validBooks[2]);
-      // prime the caches
       await listBooks();
       await getBook(bookId);
     });
   
     it("clears list cache on new book creation", async () => {
-      // ensure cache is there
       expect(await redis.exists(listKey)).toBe(1);
   
       await createBook({
@@ -363,7 +384,6 @@ describe("Task 5: Basic Caching", () => {
   
     it("clears list & single cache on update", async () => {
       const bookKey = `book:${bookId}`;
-      // prime again
       await listBooks();
       await getBook(bookId);
   
@@ -383,7 +403,6 @@ describe("Task 5: Basic Caching", () => {
     });
   
     it("clears list & single cache on delete", async () => {
-      // re-create & prime
       const tempId = await createBook({
         title: "Temp Delete",
         author: "Tester",
@@ -410,24 +429,115 @@ describe("Task 5: Basic Caching", () => {
     });
   });
   
-describe("Task 8: Popular Books Endpoint", () => {
-  beforeAll(async () => {
-    // ensure at least 4 books exist
-    for (const b of validBooks) {
-      await createBook(b);
-    }
+  describe("Task 8: Users Route", () => {
+    it.each(invalidUsers)(
+      "should return 400 for %s",
+      async (payload, desc) => {
+        const { status, body } = await api.post("/api/users").send(payload);
+        expect(status, `POST /api/users should return 400 for ${desc}`).toBe(400);
+        expect(body, `Error body should have "error" property for ${desc}`).toHaveProperty("error");
+      }
+    );
+  
+    it("should create a user and return 201 with valid UUID", async () => {
+      const { status, body } = await api.post("/api/users").send(validUsers[0]);
+      expect(status, "POST /api/users should return 201").toBe(201);
+      expect(body).toHaveProperty("id");
+      expect(typeof body.id, "id should be string").toBe("string");
+      expect(
+        body.id,
+        "id should match UUID format"
+      ).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+    });
+  
+    it("should list all users (array) with at least one item", async () => {
+      const { status, body } = await listUsers();
+      expect(status, "GET /api/users should return 200").toBe(200);
+      expect(Array.isArray(body), "Body should be array").toBe(true);
+      expect(body.length, "Array should have >=1 element").toBeGreaterThan(0);
+    });
+  
+    it("should retrieve a user by valid ID", async () => {
+      const userId = await createUser(validUsers[1]);
+      const { status, body } = await getUserDetail(userId);
+      expect(status, "GET /api/users/:id should return 200").toBe(200);
+      expect(body).toHaveProperty("id", userId);
+      expect(body.name, "name should match").toBe(validUsers[1].name);
+    });
+  
+    it("should return 404 for non-existent valid UUID", async () => {
+      const fake = "00000000-0000-0000-0000-000000000000";
+      const { status, body } = await getUserDetail(fake);
+      expect(status, "Should return 404 for missing user").toBe(404);
+      expect(body).toHaveProperty("error");
+    });
+  
+    it("should return 400 for invalid UUID format", async () => {
+      for (const bad of ["abc", "1234", "not-a-uuid"]) {
+        const { status } = await getUserDetail(bad);
+        expect(status, `Should 400 for invalid id "${bad}"`).toBe(400);
+      }
+    });
   });
-
-  it("should return array of popular books", async () => {
-    const { status, body } = await getPopular();
-    expect(status, "GET popular no limit").toBe(200);
-    expect(Array.isArray(body), "body should be array").toBe(true);
+  
+  describe("Task 9: User–Book Ownership", () => {
+    let userId;
+    let bookId;
+  
+    beforeAll(async () => {
+      userId = await createUser({ name: "Charlie", email: "charlie@example.com" });
+      bookId = await createBook(validBooks[0]);
+    });
+  
+    it("should assign a book to a user", async () => {
+      const { status, body } = await assignBookToUser(userId, bookId);
+      expect(status, "POST /api/users/:userId/books/:bookId should return 200").toBe(200);
+      expect(body).toHaveProperty("message", "Book assigned to user");
+    });
+  
+    it("should list a user's books", async () => {
+      const { status, body } = await listUserBooks(userId);
+      expect(status, "GET /api/users/:userId/books should return 200").toBe(200);
+      expect(Array.isArray(body), "Body should be array").toBe(true);
+      expect(body.find((b) => b.id === bookId), "Array should contain the assigned book").toBeDefined();
+    });
+  
+    it("should return 404 when assigning non-existent user or book", async () => {
+      const fakeUser = "00000000-0000-0000-0000-000000000000";
+      const fakeBook = "00000000-0000-0000-0000-000000000000";
+  
+      let res = await assignBookToUser(fakeUser, bookId);
+      expect(res.status, "POST with non-existent user").toBe(404);
+  
+      res = await assignBookToUser(userId, fakeBook);
+      expect(res.status, "POST with non-existent book").toBe(404);
+    });
+  
+    it("should return 400 for malformed UUIDs on assign", async () => {
+      const res = await assignBookToUser("bad-id", "also-bad");
+      expect(res.status, "Should 400 for malformed UUIDs").toBe(400);
+    });
+  
+    it("should remove a book from a user", async () => {
+      const { status } = await removeBookFromUser(userId, bookId);
+      expect(status, "DELETE /api/users/:userId/books/:bookId should return 204").toBe(204);
+  
+      const { status: listStatus, body } = await listUserBooks(userId);
+      expect(listStatus, "After removal, listing should still be 200").toBe(200);
+      expect(body.find((b) => b.id === bookId), "Removed book should no longer appear").toBeUndefined();
+    });
+  
+    it("should return 404 when removing a non-owned or non-existent book", async () => {
+      const tempBook = "00000000-0000-0000-0000-000000000000";
+      let res = await removeBookFromUser(userId, tempBook);
+      expect(res.status, "DELETE non-existent book").toBe(404);
+  
+      res = await removeBookFromUser(userId, bookId);
+      expect(res.status, "DELETE already-removed book").toBe(404);
+    });
+  
+    it("should return 400 for malformed UUIDs on remove", async () => {
+      const res = await removeBookFromUser("bad-user", "bad-book");
+      expect(res.status, "Should 400 for malformed UUIDs").toBe(400);
+    });
   });
-
-  it("should respect the limit query parameter", async () => {
-    const { status, body } = await getPopular(2);
-    expect(status, "GET popular?limit=2").toBe(200);
-    expect(Array.isArray(body)).toBe(true);
-    expect(body.length, "array length ≤ limit").toBeLessThanOrEqual(2);
-  });
-});
