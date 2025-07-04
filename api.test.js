@@ -66,12 +66,12 @@ const validBooks = [
 ];
 
 const invalidBooks = [
-  [{}, "missing all fields"],
-  [{ title: "" }, "empty title"],
-  [{ author: "" }, "empty author"],
-  [{ publishedDate: "not-a-date" }, "invalid date"],
-  [{ pages: -5 }, "negative pages"],
-  [{ pages: 0 }, "zero pages"],
+  ["missing all fields", {}],
+  ["empty title", { title: "" }],
+  ["empty author", { author: "" }],
+  ["invalid date", { publishedDate: "not-a-date" }],
+  ["negative pages", { pages: -5 }],
+  ["zero pages", { pages: 0 }],
 ];
 
 const validUsers = [
@@ -79,9 +79,9 @@ const validUsers = [
   { name: "Bob",   email: "bob@example.com" }
 ];
 const invalidUsers = [
-  [{}, "missing all fields"],
-  [{ name: "" }, "empty name"],
-  [{ email: "not-an-email" }, "invalid email"]
+  ["missing all fields", {}],
+  ["empty name", { name: "" }],
+  ["invalid email", { email: "not-an-email" }]
 ];
 
 describe("Task 1: Health Check Endpoint", () => {
@@ -96,7 +96,7 @@ describe("Task 1: Health Check Endpoint", () => {
 describe("Task 2: Book Model and POST Route", () => {
   it.each(invalidBooks)(
     "should return 400 for %s",
-    async (payload, desc) => {
+    async (desc, payload) => {
       const { status, body } = await api.post("/api/books").send(payload);
       expect(
         status,
@@ -310,6 +310,7 @@ describe("Task 5: Basic Caching", () => {
     beforeAll(async () => {
       await redis.flushall();
       bookId = await createBook(validBooks[0]);
+    });
   
     it("caches GET /api/books under a list key", async () => {
       const { status } = await listBooks();
@@ -432,7 +433,7 @@ describe("Task 5: Basic Caching", () => {
   describe("Task 8: Users Route", () => {
     it.each(invalidUsers)(
       "should return 400 for %s",
-      async (payload, desc) => {
+      async (desc, payload) => {
         const { status, body } = await api.post("/api/users").send(payload);
         expect(status, `POST /api/users should return 400 for ${desc}`).toBe(400);
         expect(body, `Error body should have "error" property for ${desc}`).toHaveProperty("error");
@@ -505,12 +506,14 @@ describe("Task 5: Basic Caching", () => {
     it("should return 404 when assigning non-existent user or book", async () => {
       const fakeUser = "00000000-0000-0000-0000-000000000000";
       const fakeBook = "00000000-0000-0000-0000-000000000000";
-  
-      let res = await assignBookToUser(fakeUser, bookId);
-      expect(res.status, "POST with non-existent user").toBe(404);
-  
-      res = await assignBookToUser(userId, fakeBook);
-      expect(res.status, "POST with non-existent book").toBe(404);
+
+      let { status, body } = await assignBookToUser(fakeUser, bookId);
+      expect(status, "POST with non-existent user").toBe(404);
+      expect(body, "Error body should have 'error'").toHaveProperty("error");
+
+      ({ status, body } = await assignBookToUser(userId, fakeBook));
+      expect(status, "POST with non-existent book").toBe(404);
+      expect(body, "Error body should have 'error'").toHaveProperty("error");
     });
   
     it("should return 400 for malformed UUIDs on assign", async () => {
@@ -529,11 +532,13 @@ describe("Task 5: Basic Caching", () => {
   
     it("should return 404 when removing a non-owned or non-existent book", async () => {
       const tempBook = "00000000-0000-0000-0000-000000000000";
-      let res = await removeBookFromUser(userId, tempBook);
-      expect(res.status, "DELETE non-existent book").toBe(404);
+      let { status, body } = await removeBookFromUser(userId, tempBook);
+      expect(status, "DELETE non-existent book").toBe(404);
+      expect(body, "Error body should have 'error'").toHaveProperty("error");
   
-      res = await removeBookFromUser(userId, bookId);
-      expect(res.status, "DELETE already-removed book").toBe(404);
+      ({ status, body } = await removeBookFromUser(userId, bookId));
+      expect(status, "DELETE already-removed book").toBe(404);
+      expect(body, "Error body should have 'error'").toHaveProperty("error");
     });
   
     it("should return 400 for malformed UUIDs on remove", async () => {
