@@ -1,0 +1,23 @@
+# host deps/build artifacts
+node_modules
+.next
+out
+*.tsbuildinfo
+
+# local configs & secrets
+.env*
+.env
+
+# Git metadata
+.git
+.gitignore
+.DS_Store
+
+# IDE/editor settings
+.vscode
+.idea
+
+# logs & coverage
+*.log
+coverage
+reports

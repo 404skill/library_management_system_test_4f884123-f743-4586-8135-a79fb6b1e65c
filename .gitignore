@@ -1,0 +1,30 @@
+# dependencies
+/node_modules/
+
+# Next.js build & export
+/.next/
+/out/
+
+# TypeScript build cache
+/*.tsbuildinfo
+
+# Local env vars
+.env
+.env.local
+.env.*.local
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Coverage reports
+/coverage/
+/reports/
+/test-reports/
+
+# IDE/editor settings
+.vscode/
+/.idea/
+.DS_Store
