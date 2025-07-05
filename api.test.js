@@ -105,7 +105,7 @@ describe("Task 1: Health Check Endpoint", () => {
 
 describe("Task 2: Book Model and POST Route", () => {
   it.each(invalidBooks)(
-    "should return 400 for %s",
+    "books route should return 400 for %s",
     async (desc, payload) => {
       const { status, body } = await api.post("/api/books").send(payload);
       expect(
@@ -175,14 +175,14 @@ describe("Task 3: CRUD Operations", () => {
     expect(body.title, "title should match").toBe(initial.title);
   });
 
-  it("should return 404 for non-existent valid UUID", async () => {
+  it("books route should return 404 for non-existent valid UUID", async () => {
     const fake = "00000000-0000-0000-0000-000000000000";
     const { status, body } = await getBook(fake);
     expect(status, "Should return 404 for missing book").toBe(404);
     expect(body).toHaveProperty("error");
   });
 
-  it("should return 400 for invalid UUID format", async () => {
+  it("books route should return 400 for invalid UUID format", async () => {
     for (const bad of ["abc", "1234", "not-a-uuid"]) {
       const { status } = await getBook(bad);
       expect(status, `Should 400 for invalid id "${bad}"`).toBe(400);
@@ -442,7 +442,7 @@ describe("Task 5: Basic Caching", () => {
   
   describe("Task 8: Users Route", () => {
     it.each(invalidUsers)(
-      "should return 400 for %s",
+      "users route should return 400 for %s",
       async (desc, payload) => {
         const { status, body } = await api.post("/api/users").send(payload);
         expect(status, `POST /api/users should return 400 for ${desc}`).toBe(400);
@@ -476,14 +476,14 @@ describe("Task 5: Basic Caching", () => {
       expect(body.name, "name should match").toBe(validUsers[1].name);
     });
   
-    it("should return 404 for non-existent valid UUID", async () => {
+    it("users route should return 404 for non-existent valid UUID", async () => {
       const fake = "00000000-0000-0000-0000-000000000000";
       const { status, body } = await getUserDetail(fake);
       expect(status, "Should return 404 for missing user").toBe(404);
       expect(body).toHaveProperty("error");
     });
   
-    it("should return 400 for invalid UUID format", async () => {
+    it("users route should return 400 for invalid UUID format", async () => {
       for (const bad of ["abc", "1234", "not-a-uuid"]) {
         const { status } = await getUserDetail(bad);
         expect(status, `Should 400 for invalid id "${bad}"`).toBe(400);
