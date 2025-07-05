@@ -84,6 +84,10 @@ const invalidUsers = [
   ["invalid email", { email: "not-an-email" }]
 ];
 
+afterAll(async () => {
+  await redis.quit();
+});
+
 describe("Task 1: Health Check Endpoint", () => {
   it("should return 200 OK with correct JSON structure", async () => {
     const { status, body } = await api.get("/api/health");
