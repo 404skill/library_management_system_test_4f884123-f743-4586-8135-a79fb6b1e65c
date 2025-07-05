@@ -3,7 +3,17 @@ jest.setTimeout(30000);
 const request = require("supertest");
 const api = request("http://app:3000");
 const Redis = require("ioredis");
-const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
+const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+  retryStrategy: null,
+  maxRetriesPerRequest: 0,
+  enableOfflineQueue: false,
+});
+
+afterAll(async () => {
+  await api.close();
+  redis.disconnect();
+});
+
 async function createBook(data) {
   const res = await api.post("/api/books").send(data);
   return res.body.id;
@@ -83,10 +93,6 @@ const invalidUsers = [
   ["empty name", { name: "" }],
   ["invalid email", { email: "not-an-email" }]
 ];
-
-afterAll(async () => {
-  await redis.quit();
-});
 
 describe("Task 1: Health Check Endpoint", () => {
   it("should return 200 OK with correct JSON structure", async () => {
